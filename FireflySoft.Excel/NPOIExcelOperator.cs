@@ -1,0 +1,648 @@
+﻿using NPOI.HSSF.UserModel;
+using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Text;
+
+namespace FireflySoft.Excel
+{
+    public class NPOIExcelOperator
+    {
+        /// <summary>
+        /// Excel数据文件物理路径
+        /// </summary>
+        private string dataFilePath = null;
+
+        /// <summary>
+        /// Excel模板文件物理路径，根据模板生成时需要
+        /// </summary>
+        private string templateFilePath = null;
+
+        /// <summary>
+        /// NPOI Excel工作簿操作接口
+        /// </summary>
+        private IWorkbook workbook = null;
+
+        /// <summary>
+        /// 内容样式字典
+        /// </summary>
+        private Dictionary<string, ICellStyle> cellStyleDictionary;
+
+        /// <summary>
+        /// 标题样式
+        /// </summary>
+        private ICellStyle titleStyle;
+
+        /// <summary>
+        /// 写入时是否使用内置样式
+        /// </summary>
+        private bool isUseBuiltInStyle;
+
+        /// <summary>
+        /// 初始化构造函数
+        /// </summary>
+        /// <param name="dataFilePath">Excel数据文件物理路径</param>
+        public NPOIExcelOperator(string dataFilePath, bool isUseBuiltInStyle) : this(string.Empty, dataFilePath, isUseBuiltInStyle)
+        {
+        }
+
+        /// <summary>
+        /// 初始化构造函数
+        /// </summary>
+        /// <param name="templateFilePath">Excel模板文件物理路径</param>
+        /// <param name="dataFilePath">Excel数据文件物理路径</param>
+        public NPOIExcelOperator(string templateFilePath, string dataFilePath, bool isUseBuiltInStyle)
+        {
+            InitTitleStyle();
+            InitContentStyle();
+
+            this.isUseBuiltInStyle = isUseBuiltInStyle;
+            this.dataFilePath = dataFilePath;
+            this.templateFilePath = templateFilePath;
+            CreateWorkbook();
+        }
+
+        /// <summary>
+        /// 初始化内容样式
+        /// </summary>
+        private void InitContentStyle()
+        {
+            cellStyleDictionary = new Dictionary<string, ICellStyle>();
+
+            // 内容字体
+            IFont contentFont = workbook.CreateFont();
+            contentFont.FontHeightInPoints = 9;
+            contentFont.FontName = "宋体";
+
+            IDataFormat format = workbook.CreateDataFormat();
+
+            // 日期样式
+            ICellStyle dateStyle = workbook.CreateCellStyle();
+            dateStyle.SetFont(contentFont);
+            dateStyle.WrapText = false;
+            dateStyle.VerticalAlignment = NPOI.SS.UserModel.VerticalAlignment.Center;
+            dateStyle.DataFormat = format.GetFormat("yyyy-MM-dd");
+            cellStyleDictionary.Add("date", dateStyle);
+
+            // 日期时间样式
+            ICellStyle dateTimeStyle = workbook.CreateCellStyle();
+            dateTimeStyle.SetFont(contentFont);
+            dateTimeStyle.WrapText = false;
+            dateTimeStyle.VerticalAlignment = NPOI.SS.UserModel.VerticalAlignment.Center;
+            dateTimeStyle.DataFormat = format.GetFormat("yyyy-MM-dd HH:mm:ss");
+            cellStyleDictionary.Add("datetime", dateStyle);
+
+            // Money样式
+            ICellStyle doubleStyle = workbook.CreateCellStyle();
+            doubleStyle.SetFont(contentFont);
+            doubleStyle.WrapText = false;
+            doubleStyle.VerticalAlignment = NPOI.SS.UserModel.VerticalAlignment.Center;
+            doubleStyle.DataFormat = HSSFDataFormat.GetBuiltinFormat("0.00");
+            cellStyleDictionary.Add("double", doubleStyle);
+
+            // 文本样式
+            ICellStyle textStyle = workbook.CreateCellStyle();
+            textStyle.SetFont(contentFont);
+            textStyle.WrapText = false;
+            textStyle.VerticalAlignment = NPOI.SS.UserModel.VerticalAlignment.Center;
+            cellStyleDictionary.Add("text", textStyle);
+        }
+
+        /// <summary>
+        /// 初始化标题样式
+        /// </summary>
+        private void InitTitleStyle()
+        {
+            // 标题字体
+            IFont titleFont = workbook.CreateFont();
+            titleFont.FontHeightInPoints = 9;
+            titleFont.FontName = "宋体";
+            titleFont.Boldweight = (short)FontBoldWeight.Bold;
+
+            // 标题样式
+            titleStyle = workbook.CreateCellStyle();
+            titleStyle.WrapText = false;
+            titleStyle.SetFont(titleFont);
+            titleStyle.Alignment = NPOI.SS.UserModel.HorizontalAlignment.Left;
+            titleStyle.VerticalAlignment = NPOI.SS.UserModel.VerticalAlignment.Center;
+        }
+
+        /// <summary>
+        /// 获取Excel工作簿
+        /// </summary>
+        /// <returns></returns>
+        public IWorkbook GetWorkBook()
+        {
+            return workbook;
+        }
+
+        /// <summary>
+        /// 根据Sheet表名称获取Sheet表
+        /// </summary>
+        /// <param name="sheetName"></param>
+        /// <returns></returns>
+        public ISheet GetSheet(string sheetName)
+        {
+            if (!string.IsNullOrWhiteSpace(sheetName))
+            {
+                throw new ArgumentNullException("sheetName为空");
+            }
+
+            return workbook.GetSheet(sheetName);
+        }
+
+        /// <summary>
+        /// 根据Sheet表索引位置获取Sheet表
+        /// </summary>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        public ISheet GetSheet(int index)
+        {
+            if (index >= 0)
+            {
+                return workbook.GetSheetAt(index);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 创建指定名称的Sheet表
+        /// </summary>
+        /// <param name="sheetName"></param>
+        /// <returns></returns>
+        public ISheet CreateSheet(string sheetName)
+        {
+            if (!string.IsNullOrWhiteSpace(sheetName))
+            {
+                throw new ArgumentNullException("sheetName为空");
+            }
+
+            return workbook.CreateSheet(sheetName);
+        }
+
+        /// <summary>
+        /// 将DataTable数据写入到Sheet表，默认从Sheet表的第0行开始
+        /// </summary>
+        /// <param name="sheetName">Sheet表名</param>
+        /// <param name="data">DataTable数据</param>
+        /// <param name="isWriteTitle">是否写入DataTable列名作为Sheet表标题</param>
+        /// <returns>写入的最后行号</returns>
+        public int WriteSheet(string sheetName, DataTable data, bool isWriteTitle)
+        {
+            if (workbook == null)
+            {
+                throw new NullReferenceException("workbook为null，请先调用Open方法初始化workbook");
+            }
+
+            ISheet sheet = GetSheet(sheetName);
+            if (sheet == null)
+            {
+                CreateSheet(sheetName);
+            }
+
+            return WriteSheet(sheet, data, isWriteTitle);
+        }
+
+        /// <summary>
+        /// 将DataTable数据写入到Sheet表，默认从Sheet表的第0行开始
+        /// </summary>
+        /// <param name="sheet">Sheet表</param>
+        /// <param name="data">DataTable数据</param>
+        /// <param name="isWriteTitle">是否写入DataTable列名作为Sheet表标题</param>
+        /// <returns>写入的最后行号</returns>
+        public int WriteSheet(ISheet sheet, DataTable data, bool isWriteTitle)
+        {
+            return WriteSheet(sheet, data, isWriteTitle, 0);
+        }
+
+        /// <summary>
+        /// 将DataTable数据写入到Sheet表
+        /// </summary>
+        /// <param name="sheet">Sheet表</param>
+        /// <param name="data">DataTable数据</param>
+        /// <param name="isWriteTitle">是否写入DataTable列名作为Sheet表标题</param>
+        /// <param name="startRowNumber">开始写入数据的行号（从0开始）</param>
+        /// <returns>写入的最后行号</returns>
+        public int WriteSheet(ISheet sheet, DataTable data, bool isWriteTitle, int startRowNumber)
+        {
+            int endRowNumber = 0;
+
+            // 创建标题行
+            if (isWriteTitle == true)
+            {
+                WriteTitleRow(sheet, data.Columns);
+                startRowNumber++;
+            }
+
+            // 创建数据行
+            endRowNumber = WriteContentRows(sheet, data, startRowNumber);
+
+            // 自动适应列宽
+            AutoFitColumnWidth(sheet, data.Columns.Count);
+
+            return endRowNumber;
+        }
+
+        /// <summary>
+        /// 将内存中的数据写入到Excel数据文件
+        /// </summary>
+        public void Flush()
+        {
+            using (var dataFileStream = new FileStream(dataFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            {
+                workbook.Write(dataFileStream);
+            }
+        }
+
+        /// <summary>
+        /// 将Excel数据读取到DataTable中
+        /// </summary>
+        /// <param name="sheetName">Excel Sheet表名</param>
+        /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
+        /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
+        public DataTable Read(string sheetName, bool isReadTitle)
+        {
+            ISheet sheet = null;
+            DataTable data = null;
+            int startRow = 0;
+
+            if (workbook == null)
+            {
+                throw new NullReferenceException("workbook为null，请先调用Open方法初始化workbook");
+            }
+
+            if (sheetName != null)
+            {
+                sheet = GetSheet(sheetName);
+            }
+
+            if (sheet != null)
+            {
+                data = new DataTable();
+                IRow firstRow = sheet.GetRow(0);
+                int cellCount = firstRow.LastCellNum;
+
+                // 是否读取标题行
+                if (isReadTitle)
+                {
+                    for (int i = firstRow.FirstCellNum; i < cellCount; ++i)
+                    {
+                        DataColumn column = new DataColumn(firstRow.GetCell(i).StringCellValue);
+                        data.Columns.Add(column);
+                    }
+
+                    startRow = sheet.FirstRowNum + 1;
+                }
+                else
+                {
+                    startRow = sheet.FirstRowNum;
+                }
+
+                // 遍历所有数据行
+                int rowCount = sheet.LastRowNum;
+                for (int i = startRow; i <= rowCount; ++i)
+                {
+                    IRow row = sheet.GetRow(i);
+                    if (row == null) continue;
+
+                    DataRow dataRow = data.NewRow();
+                    for (int j = row.FirstCellNum; j < cellCount; ++j)
+                    {
+                        if (row.GetCell(j) != null)
+                            dataRow[j] = row.GetCell(j).ToString();
+                    }
+
+                    data.Rows.Add(dataRow);
+                }
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// 创建标题行
+        /// </summary>
+        /// <param name="sheet"></param>
+        /// <param name="data"></param>
+        public void WriteTitleRow(ISheet sheet, DataColumnCollection columns)
+        {
+            IRow row = sheet.CreateRow(0);
+            row.Height = 26 * 20;
+            for (int j = 0; j < columns.Count; ++j)
+            {
+                var cell = row.CreateCell(j);
+                cell.SetCellValue(columns[j].ColumnName);
+                cell.CellStyle = titleStyle;
+            }
+        }
+
+        /// <summary>
+        /// CreateRows
+        /// </summary>
+        /// <param name="sheet"></param>
+        /// <param name="data"></param>
+        /// <param name="strartRowNumber"></param>
+        /// <returns></returns>
+        public int WriteContentRows(ISheet sheet, DataTable data, int strartRowNumber)
+        {
+            // 创建内容行
+            for (int i = 0; i < data.Rows.Count; ++i)
+            {
+                IRow row = sheet.CreateRow(strartRowNumber);
+                row.Height = 26 * 20;
+
+                for (int j = 0; j < data.Columns.Count; ++j)
+                {
+                    var cell = row.CreateCell(j);
+                    var cellDataType = GetCellDataType(data.Columns[j], data.Rows[i][j]);
+                    WriteCell(cell, data.Rows[i][j], cellDataType);
+                }
+
+                strartRowNumber++;
+            }
+
+            return strartRowNumber;
+        }
+
+        /// <summary>
+        /// 获取CellDataType
+        /// </summary>
+        /// <param name="column"></param>
+        /// <param name="cellValue"></param>
+        /// <returns></returns>
+        private CellDataType GetCellDataType(DataColumn column, object cellValue)
+        {
+            CellDataType cellDataType = CellDataType.None;
+
+            if (isUseBuiltInStyle)
+            {
+                if (cellValue != null && cellValue != DBNull.Value)
+                {
+                    if (column.ExtendedProperties != null && column.ExtendedProperties.Count > 0)
+                    {
+                        if (column.ExtendedProperties.ContainsKey("DataType"))
+                        {
+                            var propertyDataType = column.ExtendedProperties["DataType"].ToString();
+                            cellDataType = GetDataTypeFromColumnExtendedProperty(propertyDataType);
+                        }
+                    }
+                    else
+                    {
+                        Type columnDataType = column.DataType;
+                        cellDataType = GetDataTypeFromColumnDataType(columnDataType);
+                    }
+                }
+            }
+
+            return cellDataType;
+        }
+
+        /// <summary>
+        /// 从数据列的类型获取DataType
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        private static CellDataType GetDataTypeFromColumnDataType(Type type)
+        {
+            CellDataType dataType = CellDataType.Null;
+
+            if (type == typeof(DateTime))
+            {
+                dataType = CellDataType.DateTime;
+            }
+            else if (type == typeof(int))
+            {
+                dataType = CellDataType.Int;
+            }
+            else if (type == typeof(double))
+            {
+                dataType = CellDataType.Double;
+            }
+            else if (type == typeof(decimal))
+            {
+                dataType = CellDataType.Double;
+            }
+            else
+            {
+                dataType = CellDataType.Text;
+            }
+
+            return dataType;
+        }
+
+        /// <summary>
+        /// 从列的扩展属性获取DataType
+        /// </summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
+        private static CellDataType GetDataTypeFromColumnExtendedProperty(string property)
+        {
+            CellDataType dataType = CellDataType.Null;
+            switch (property)
+            {
+                case "Date":
+                    dataType = CellDataType.Date;
+                    break;
+                case "DateTime":
+                    dataType = CellDataType.DateTime;
+                    break;
+                case "Int":
+                    dataType = CellDataType.Int;
+                    break;
+                case "Double":
+                    dataType = CellDataType.Double;
+                    break;
+                case "Boolean":
+                    dataType = CellDataType.Boolean;
+                    break;
+                case "Formula":
+                    dataType = CellDataType.Formula;
+                    break;
+                case "RichText":
+                    dataType = CellDataType.RichText;
+                    break;
+                default:
+                    dataType = CellDataType.Text;
+                    break;
+            }
+
+            return dataType;
+        }
+
+        public void WriteCell(ISheet sheet, int rowNumber, int columnNumber, object value, CellDataType dataType)
+        {
+            var row = sheet.GetRow(rowNumber);
+            if (row == null)
+            {
+                row = sheet.CreateRow(rowNumber);
+            }
+
+            WriteCell(row, columnNumber, value, dataType);
+        }
+
+        public void WriteCell(IRow row, int columnNumber, object value, CellDataType dataType)
+        {
+            var cell = row.GetCell(columnNumber);
+            if (cell == null)
+            {
+                cell = row.CreateCell(columnNumber);
+            }
+
+            WriteCell(cell, value, dataType);
+        }
+
+        public void WriteCell(ICell cell, object value, CellDataType dataType)
+        {
+            if (dataType == CellDataType.Null || value == null || value == DBNull.Value)
+            {
+                cell.SetCellType(CellType.Blank);
+                return;
+            }
+
+            if (value is DateTime)
+            {
+                cell.SetCellValue((DateTime)value);
+            }
+            else if (value is int)
+            {
+                cell.SetCellValue((int)value);
+            }
+            else if (value is double)
+            {
+                cell.SetCellValue((double)value);
+            }
+            else if (value is decimal)
+            {
+                cell.SetCellValue(Convert.ToDouble(value));
+            }
+            else
+            {
+                cell.SetCellValue(value.ToString());
+            }
+
+            if (dataType != CellDataType.None)
+            {
+                switch (dataType)
+                {
+                    case CellDataType.Date:
+                        cell.CellStyle = cellStyleDictionary["date"];
+                        break;
+                    case CellDataType.DateTime:
+                        cell.CellStyle = cellStyleDictionary["datetime"];
+                        break;
+                    case CellDataType.Double:
+                        cell.CellStyle = cellStyleDictionary["double"];
+                        break;
+                    default:
+                        cell.CellStyle = cellStyleDictionary["text"];
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 自动适应列宽
+        /// </summary>
+        /// <param name="columnCount"></param>
+        /// <param name="sheet"></param>
+        public void AutoFitColumnWidth(ISheet sheet, int columnCount)
+        {
+            //列宽自适应，只对英文和数字有效
+            for (int ci = 0; ci < columnCount; ci++)
+            {
+                sheet.AutoSizeColumn(ci);
+            }
+            //获取当前列的宽度，然后对比本列的长度，取最大值
+            for (int columnNum = 0; columnNum < columnCount; columnNum++)
+            {
+                int columnWidth = sheet.GetColumnWidth(columnNum) / 256;
+                for (int rowNum = 0; rowNum < sheet.LastRowNum; rowNum++)
+                {
+                    if (rowNum == 0 || rowNum == sheet.LastRowNum - 1 || rowNum == sheet.LastRowNum / 2)
+                    {
+                        IRow currentRow;
+
+                        //当前行未被使用过
+                        if (sheet.GetRow(rowNum) == null)
+                        {
+                            currentRow = sheet.CreateRow(rowNum);
+                        }
+                        else
+                        {
+                            currentRow = sheet.GetRow(rowNum);
+                        }
+
+                        if (currentRow.GetCell(columnNum) != null)
+                        {
+                            ICell currentCell = currentRow.GetCell(columnNum);
+                            int length = Encoding.Default.GetBytes(currentCell.ToString()).Length;
+                            if (columnWidth < length)
+                            {
+                                columnWidth = length;
+                            }
+                        }
+                    }
+                }
+
+                sheet.SetColumnWidth(columnNum, columnWidth * 256);
+            }
+        }
+
+        /// <summary>
+        /// 打开要读取或写入的Excel工作簿
+        /// </summary>
+        /// <returns></returns>
+        private IWorkbook CreateWorkbook()
+        {
+            if (!string.IsNullOrEmpty(templateFilePath))
+            {
+                using (var templateFile = new FileStream(templateFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    if (templateFilePath.IndexOf(".xlsx") > 0)
+                    {
+                        workbook = new XSSFWorkbook(templateFile);
+                    }
+                    else if (templateFilePath.IndexOf(".xls") > 0)
+                    {
+                        workbook = new HSSFWorkbook(templateFile);
+                    }
+                }
+            }
+            else
+            {
+                if (File.Exists(dataFilePath))
+                {
+                    using (var dataFile = new FileStream(dataFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        if (dataFilePath.IndexOf(".xlsx") > 0)
+                        {
+                            workbook = new XSSFWorkbook(dataFile);
+                        }
+                        else if (dataFilePath.IndexOf(".xls") > 0)
+                        {
+                            workbook = new HSSFWorkbook(dataFile);
+                        }
+                    }
+                }
+                else
+                {
+                    if (dataFilePath.IndexOf(".xlsx") > 0)
+                    {
+                        workbook = new XSSFWorkbook();
+                    }
+                    else if (dataFilePath.IndexOf(".xls") > 0)
+                    {
+                        workbook = new HSSFWorkbook();
+                    }
+                }
+            }
+
+            return workbook;
+        }
+    }
+}
