@@ -5,6 +5,9 @@ using System.Text;
 
 namespace FireflySoft.Excel
 {
+    /// <summary>
+    /// 单元格数据类型
+    /// </summary>
     public enum CellDataType
     {
         None = 0,

@@ -46,7 +46,8 @@ namespace FireflySoft.Excel
         /// 初始化构造函数
         /// </summary>
         /// <param name="dataFilePath">Excel数据文件物理路径</param>
-        public NPOIExcelOperator(string dataFilePath, bool isUseBuiltInStyle) : this(string.Empty, dataFilePath, isUseBuiltInStyle)
+        public NPOIExcelOperator(string dataFilePath, bool isUseBuiltInStyle)
+            : this(string.Empty, dataFilePath, isUseBuiltInStyle)
         {
         }
 
@@ -235,12 +236,12 @@ namespace FireflySoft.Excel
             // 创建标题行
             if (isWriteTitle == true)
             {
-                WriteTitleRow(sheet, data.Columns);
+                WriteTitle(sheet, data.Columns);
                 startRowNumber++;
             }
 
             // 创建数据行
-            endRowNumber = WriteContentRows(sheet, data, startRowNumber);
+            endRowNumber = WriteContent(sheet, data, startRowNumber);
 
             // 自动适应列宽
             AutoFitColumnWidth(sheet, data.Columns.Count);
@@ -260,12 +261,12 @@ namespace FireflySoft.Excel
         }
 
         /// <summary>
-        /// 将Excel数据读取到DataTable中
+        /// 将Sheet表数据读取到DataTable
         /// </summary>
         /// <param name="sheetName">Excel Sheet表名</param>
         /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
         /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
-        public DataTable Read(string sheetName, bool isReadTitle)
+        public DataTable ReadSheet(string sheetName, bool isReadTitle)
         {
             ISheet sheet = null;
             DataTable data = null;
@@ -290,10 +291,10 @@ namespace FireflySoft.Excel
                 // 是否读取标题行
                 if (isReadTitle)
                 {
-                    for (int i = firstRow.FirstCellNum; i < cellCount; ++i)
+                    var cols = ReadTitle(firstRow);
+                    if (cols != null)
                     {
-                        DataColumn column = new DataColumn(firstRow.GetCell(i).StringCellValue);
-                        data.Columns.Add(column);
+                        data.Columns.AddRange(cols);
                     }
 
                     startRow = sheet.FirstRowNum + 1;
@@ -303,33 +304,88 @@ namespace FireflySoft.Excel
                     startRow = sheet.FirstRowNum;
                 }
 
-                // 遍历所有数据行
+                // 读取数据
                 int rowCount = sheet.LastRowNum;
-                for (int i = startRow; i <= rowCount; ++i)
-                {
-                    IRow row = sheet.GetRow(i);
-                    if (row == null) continue;
-
-                    DataRow dataRow = data.NewRow();
-                    for (int j = row.FirstCellNum; j < cellCount; ++j)
-                    {
-                        if (row.GetCell(j) != null)
-                            dataRow[j] = row.GetCell(j).ToString();
-                    }
-
-                    data.Rows.Add(dataRow);
-                }
+                ReadContent(sheet, startRow, rowCount, data);
             }
 
             return data;
         }
 
         /// <summary>
-        /// 创建标题行
+        /// 读取sheet表数据到DataTable中
+        /// </summary>
+        /// <param name="sheet">sheet表</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <param name="endRowNumber">终止行号</param>
+        /// <param name="table">要读入数据的DataTable</param>
+        /// <returns>读取的数据行数</returns>
+        public int ReadContent(ISheet sheet, int startRowNumber, int endRowNumber, DataTable table)
+        {
+            int columnCount = table.Columns.Count;
+            int rowCount = 0;
+            for (int i = startRowNumber; i <= endRowNumber; ++i)
+            {
+                IRow row = sheet.GetRow(i);
+                if (row == null) continue;
+
+                DataRow dataRow = table.NewRow();
+                for (int j = row.FirstCellNum; j < columnCount; ++j)
+                {
+                    if (row.GetCell(j) != null)
+                        dataRow[j] = row.GetCell(j).ToString();
+                }
+
+                table.Rows.Add(dataRow);
+                rowCount++;
+            }
+
+            return rowCount;
+        }
+
+        /// <summary>
+        /// 获取Sheet表的标题
+        /// </summary>
+        /// <param name="sheet">sheet表</param>
+        /// <returns>标题列数组</returns>
+        public DataColumn[] ReadTitle(ISheet sheet)
+        {
+            IRow firstRow = sheet.GetRow(0);
+            if (firstRow == null)
+            {
+                return new DataColumn[0];
+            }
+
+            return ReadTitle(firstRow);
+        }
+
+        /// <summary>
+        /// 从Row实例获取标题
+        /// </summary>
+        /// <param name="row">Row实例</param>
+        /// <returns>标题列数组</returns>
+        public DataColumn[] ReadTitle(IRow row)
+        {
+            int cellCount = row.LastCellNum;
+            DataColumn[] cols = new DataColumn[cellCount];
+
+            int j = 0;
+            for (int i = row.FirstCellNum; i < cellCount; i++)
+            {
+                DataColumn column = new DataColumn(row.GetCell(i).StringCellValue);
+                cols[j] = column;
+                j++;
+            }
+
+            return cols;
+        }
+
+        /// <summary>
+        /// 写入数据到Sheet表标题
         /// </summary>
         /// <param name="sheet"></param>
         /// <param name="data"></param>
-        public void WriteTitleRow(ISheet sheet, DataColumnCollection columns)
+        public void WriteTitle(ISheet sheet, DataColumnCollection columns)
         {
             IRow row = sheet.CreateRow(0);
             row.Height = 26 * 20;
@@ -342,13 +398,13 @@ namespace FireflySoft.Excel
         }
 
         /// <summary>
-        /// CreateRows
+        /// 写入数据到内容行
         /// </summary>
         /// <param name="sheet"></param>
         /// <param name="data"></param>
         /// <param name="strartRowNumber"></param>
         /// <returns></returns>
-        public int WriteContentRows(ISheet sheet, DataTable data, int strartRowNumber)
+        public int WriteContent(ISheet sheet, DataTable data, int strartRowNumber)
         {
             // 创建内容行
             for (int i = 0; i < data.Rows.Count; ++i)
@@ -372,12 +428,12 @@ namespace FireflySoft.Excel
         /// <summary>
         /// 获取CellDataType
         /// </summary>
-        /// <param name="column"></param>
-        /// <param name="cellValue"></param>
+        /// <param name="column">列构造实例</param>
+        /// <param name="cellValue">单元格数据</param>
         /// <returns></returns>
         private CellDataType GetCellDataType(DataColumn column, object cellValue)
         {
-            CellDataType cellDataType = CellDataType.None;
+            var cellDataType = CellDataType.None;
 
             if (isUseBuiltInStyle)
             {
@@ -387,8 +443,8 @@ namespace FireflySoft.Excel
                     {
                         if (column.ExtendedProperties.ContainsKey("DataType"))
                         {
-                            var propertyDataType = column.ExtendedProperties["DataType"].ToString();
-                            cellDataType = GetDataTypeFromColumnExtendedProperty(propertyDataType);
+                            var propertyValue = column.ExtendedProperties["DataType"].ToString();
+                            cellDataType = GetDataTypeFromColumnExtendedProperty(propertyValue);
                         }
                     }
                     else
@@ -405,11 +461,11 @@ namespace FireflySoft.Excel
         /// <summary>
         /// 从数据列的类型获取DataType
         /// </summary>
-        /// <param name="type"></param>
-        /// <returns></returns>
+        /// <param name="type">数据类型</param>
+        /// <returns>单元格数据类型</returns>
         private static CellDataType GetDataTypeFromColumnDataType(Type type)
         {
-            CellDataType dataType = CellDataType.Null;
+            var dataType = CellDataType.None;
 
             if (type == typeof(DateTime))
             {
@@ -427,6 +483,10 @@ namespace FireflySoft.Excel
             {
                 dataType = CellDataType.Double;
             }
+            else if (type == typeof(bool))
+            {
+                dataType = CellDataType.Boolean;
+            }
             else
             {
                 dataType = CellDataType.Text;
@@ -438,13 +498,17 @@ namespace FireflySoft.Excel
         /// <summary>
         /// 从列的扩展属性获取DataType
         /// </summary>
-        /// <param name="property"></param>
-        /// <returns></returns>
-        private static CellDataType GetDataTypeFromColumnExtendedProperty(string property)
+        /// <param name="propertyValue">属性值</param>
+        /// <returns>单元格数据类型</returns>
+        private static CellDataType GetDataTypeFromColumnExtendedProperty(string propertyValue)
         {
-            CellDataType dataType = CellDataType.Null;
-            switch (property)
+            var dataType = CellDataType.None;
+
+            switch (propertyValue)
             {
+                case "Null":
+                    dataType = CellDataType.Null;
+                    break;
                 case "Date":
                     dataType = CellDataType.Date;
                     break;
@@ -474,6 +538,14 @@ namespace FireflySoft.Excel
             return dataType;
         }
 
+        /// <summary>
+        /// 写入数据到单元格
+        /// </summary>
+        /// <param name="sheet">要写入数据的sheet表实例</param>
+        /// <param name="rowNumber">要写入数据的行号</param>
+        /// <param name="columnNumber">要写入数据的列号</param>
+        /// <param name="value">要写入的数据</param>
+        /// <param name="dataType">要写入数据的类型</param>
         public void WriteCell(ISheet sheet, int rowNumber, int columnNumber, object value, CellDataType dataType)
         {
             var row = sheet.GetRow(rowNumber);
@@ -485,6 +557,13 @@ namespace FireflySoft.Excel
             WriteCell(row, columnNumber, value, dataType);
         }
 
+        /// <summary>
+        /// 写入数据到单元格
+        /// </summary>
+        /// <param name="row">要写入数据的行实例</param>
+        /// <param name="columnNumber">要写入数据的列号</param>
+        /// <param name="value">要写入的数据</param>
+        /// <param name="dataType">要写入数据的类型</param>
         public void WriteCell(IRow row, int columnNumber, object value, CellDataType dataType)
         {
             var cell = row.GetCell(columnNumber);
@@ -496,9 +575,15 @@ namespace FireflySoft.Excel
             WriteCell(cell, value, dataType);
         }
 
+        /// <summary>
+        /// 写入数据到单元格
+        /// </summary>
+        /// <param name="cell">要写入数据的单元格实例</param>
+        /// <param name="value">要写入的数据</param>
+        /// <param name="dataType">要写入数据的类型</param>
         public void WriteCell(ICell cell, object value, CellDataType dataType)
         {
-            if (dataType == CellDataType.Null || value == null || value == DBNull.Value)
+            if (dataType == CellDataType.None || dataType == CellDataType.Null || value == null || value == DBNull.Value)
             {
                 cell.SetCellType(CellType.Blank);
                 return;
@@ -548,8 +633,8 @@ namespace FireflySoft.Excel
         /// <summary>
         /// 自动适应列宽
         /// </summary>
-        /// <param name="columnCount"></param>
-        /// <param name="sheet"></param>
+        /// <param name="sheet">需要自适应列宽的sheet表</param>
+        /// <param name="columnCount">列数</param>
         public void AutoFitColumnWidth(ISheet sheet, int columnCount)
         {
             //列宽自适应，只对英文和数字有效
@@ -594,7 +679,7 @@ namespace FireflySoft.Excel
         }
 
         /// <summary>
-        /// 打开要读取或写入的Excel工作簿
+        /// 根据模板或数据excel文件创建工作簿实例
         /// </summary>
         /// <returns></returns>
         private IWorkbook CreateWorkbook()
