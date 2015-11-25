@@ -186,6 +186,7 @@ namespace FireflySoft.Excel
             return workbook.CreateSheet(sheetName);
         }
 
+        #region 写数据
         /// <summary>
         /// 将DataTable数据写入到Sheet表，默认从Sheet表的第0行开始
         /// </summary>
@@ -236,7 +237,8 @@ namespace FireflySoft.Excel
             // 创建标题行
             if (isWriteTitle == true)
             {
-                WriteTitle(sheet, data.Columns);
+                IRow titleRow = sheet.CreateRow(startRowNumber);
+                WriteTitle(titleRow, data.Columns);
                 startRowNumber++;
             }
 
@@ -250,145 +252,24 @@ namespace FireflySoft.Excel
         }
 
         /// <summary>
-        /// 将内存中的数据写入到Excel数据文件
-        /// </summary>
-        public void Flush()
-        {
-            using (var dataFileStream = new FileStream(dataFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
-            {
-                workbook.Write(dataFileStream);
-            }
-        }
-
-        /// <summary>
-        /// 将Sheet表数据读取到DataTable
-        /// </summary>
-        /// <param name="sheetName">Excel Sheet表名</param>
-        /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
-        /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
-        public DataTable ReadSheet(string sheetName, bool isReadTitle)
-        {
-            ISheet sheet = null;
-            DataTable data = null;
-            int startRow = 0;
-
-            if (workbook == null)
-            {
-                throw new NullReferenceException("workbook为null，请先调用Open方法初始化workbook");
-            }
-
-            if (sheetName != null)
-            {
-                sheet = GetSheet(sheetName);
-            }
-
-            if (sheet != null)
-            {
-                data = new DataTable();
-                IRow firstRow = sheet.GetRow(0);
-                int cellCount = firstRow.LastCellNum;
-
-                // 是否读取标题行
-                if (isReadTitle)
-                {
-                    var cols = ReadTitle(firstRow);
-                    if (cols != null)
-                    {
-                        data.Columns.AddRange(cols);
-                    }
-
-                    startRow = sheet.FirstRowNum + 1;
-                }
-                else
-                {
-                    startRow = sheet.FirstRowNum;
-                }
-
-                // 读取数据
-                int rowCount = sheet.LastRowNum;
-                ReadContent(sheet, startRow, rowCount, data);
-            }
-
-            return data;
-        }
-
-        /// <summary>
-        /// 读取sheet表数据到DataTable中
-        /// </summary>
-        /// <param name="sheet">sheet表</param>
-        /// <param name="startRowNumber">起始行号</param>
-        /// <param name="endRowNumber">终止行号</param>
-        /// <param name="table">要读入数据的DataTable</param>
-        /// <returns>读取的数据行数</returns>
-        public int ReadContent(ISheet sheet, int startRowNumber, int endRowNumber, DataTable table)
-        {
-            int columnCount = table.Columns.Count;
-            int rowCount = 0;
-            for (int i = startRowNumber; i <= endRowNumber; ++i)
-            {
-                IRow row = sheet.GetRow(i);
-                if (row == null) continue;
-
-                DataRow dataRow = table.NewRow();
-                for (int j = row.FirstCellNum; j < columnCount; ++j)
-                {
-                    if (row.GetCell(j) != null)
-                        dataRow[j] = row.GetCell(j).ToString();
-                }
-
-                table.Rows.Add(dataRow);
-                rowCount++;
-            }
-
-            return rowCount;
-        }
-
-        /// <summary>
-        /// 获取Sheet表的标题
-        /// </summary>
-        /// <param name="sheet">sheet表</param>
-        /// <returns>标题列数组</returns>
-        public DataColumn[] ReadTitle(ISheet sheet)
-        {
-            IRow firstRow = sheet.GetRow(0);
-            if (firstRow == null)
-            {
-                return new DataColumn[0];
-            }
-
-            return ReadTitle(firstRow);
-        }
-
-        /// <summary>
-        /// 从Row实例获取标题
-        /// </summary>
-        /// <param name="row">Row实例</param>
-        /// <returns>标题列数组</returns>
-        public DataColumn[] ReadTitle(IRow row)
-        {
-            int cellCount = row.LastCellNum;
-            DataColumn[] cols = new DataColumn[cellCount];
-
-            int j = 0;
-            for (int i = row.FirstCellNum; i < cellCount; i++)
-            {
-                DataColumn column = new DataColumn(row.GetCell(i).StringCellValue);
-                cols[j] = column;
-                j++;
-            }
-
-            return cols;
-        }
-
-        /// <summary>
         /// 写入数据到Sheet表标题
         /// </summary>
         /// <param name="sheet"></param>
-        /// <param name="data"></param>
+        /// <param name="columns"></param>
         public void WriteTitle(ISheet sheet, DataColumnCollection columns)
         {
             IRow row = sheet.CreateRow(0);
-            row.Height = 26 * 20;
+
+            WriteTitle(row, columns);
+        }
+
+        /// <summary>
+        /// 写入数据到Row
+        /// </summary>
+        /// <param name="row"></param>
+        /// <param name="columns"></param>
+        public void WriteTitle(IRow row, DataColumnCollection columns)
+        {
             for (int j = 0; j < columns.Count; ++j)
             {
                 var cell = row.CreateCell(j);
@@ -415,7 +296,13 @@ namespace FireflySoft.Excel
                 for (int j = 0; j < data.Columns.Count; ++j)
                 {
                     var cell = row.CreateCell(j);
-                    var cellDataType = GetCellDataType(data.Columns[j], data.Rows[i][j]);
+
+                    CellDataType cellDataType = CellDataType.None;
+                    if (data.Rows[i][j] != null)
+                    {
+                        cellDataType = GetCellDataTypeByColumn(data.Columns[j]);
+                    }
+
                     WriteCell(cell, data.Rows[i][j], cellDataType);
                 }
 
@@ -423,119 +310,6 @@ namespace FireflySoft.Excel
             }
 
             return strartRowNumber;
-        }
-
-        /// <summary>
-        /// 获取CellDataType
-        /// </summary>
-        /// <param name="column">列构造实例</param>
-        /// <param name="cellValue">单元格数据</param>
-        /// <returns></returns>
-        private CellDataType GetCellDataType(DataColumn column, object cellValue)
-        {
-            var cellDataType = CellDataType.None;
-
-            if (isUseBuiltInStyle)
-            {
-                if (cellValue != null && cellValue != DBNull.Value)
-                {
-                    if (column.ExtendedProperties != null && column.ExtendedProperties.Count > 0)
-                    {
-                        if (column.ExtendedProperties.ContainsKey("DataType"))
-                        {
-                            var propertyValue = column.ExtendedProperties["DataType"].ToString();
-                            cellDataType = GetDataTypeFromColumnExtendedProperty(propertyValue);
-                        }
-                    }
-                    else
-                    {
-                        Type columnDataType = column.DataType;
-                        cellDataType = GetDataTypeFromColumnDataType(columnDataType);
-                    }
-                }
-            }
-
-            return cellDataType;
-        }
-
-        /// <summary>
-        /// 从数据列的类型获取DataType
-        /// </summary>
-        /// <param name="type">数据类型</param>
-        /// <returns>单元格数据类型</returns>
-        private static CellDataType GetDataTypeFromColumnDataType(Type type)
-        {
-            var dataType = CellDataType.None;
-
-            if (type == typeof(DateTime))
-            {
-                dataType = CellDataType.DateTime;
-            }
-            else if (type == typeof(int))
-            {
-                dataType = CellDataType.Int;
-            }
-            else if (type == typeof(double))
-            {
-                dataType = CellDataType.Double;
-            }
-            else if (type == typeof(decimal))
-            {
-                dataType = CellDataType.Double;
-            }
-            else if (type == typeof(bool))
-            {
-                dataType = CellDataType.Boolean;
-            }
-            else
-            {
-                dataType = CellDataType.Text;
-            }
-
-            return dataType;
-        }
-
-        /// <summary>
-        /// 从列的扩展属性获取DataType
-        /// </summary>
-        /// <param name="propertyValue">属性值</param>
-        /// <returns>单元格数据类型</returns>
-        private static CellDataType GetDataTypeFromColumnExtendedProperty(string propertyValue)
-        {
-            var dataType = CellDataType.None;
-
-            switch (propertyValue)
-            {
-                case "Null":
-                    dataType = CellDataType.Null;
-                    break;
-                case "Date":
-                    dataType = CellDataType.Date;
-                    break;
-                case "DateTime":
-                    dataType = CellDataType.DateTime;
-                    break;
-                case "Int":
-                    dataType = CellDataType.Int;
-                    break;
-                case "Double":
-                    dataType = CellDataType.Double;
-                    break;
-                case "Boolean":
-                    dataType = CellDataType.Boolean;
-                    break;
-                case "Formula":
-                    dataType = CellDataType.Formula;
-                    break;
-                case "RichText":
-                    dataType = CellDataType.RichText;
-                    break;
-                default:
-                    dataType = CellDataType.Text;
-                    break;
-            }
-
-            return dataType;
         }
 
         /// <summary>
@@ -631,6 +405,19 @@ namespace FireflySoft.Excel
         }
 
         /// <summary>
+        /// 将内存中的数据写入到Excel数据文件
+        /// </summary>
+        public void Flush()
+        {
+            using (var dataFileStream = new FileStream(dataFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            {
+                workbook.Write(dataFileStream);
+            }
+        }
+        #endregion
+
+        #region 读数据
+        /// <summary>
         /// 自动适应列宽
         /// </summary>
         /// <param name="sheet">需要自适应列宽的sheet表</param>
@@ -677,6 +464,248 @@ namespace FireflySoft.Excel
                 sheet.SetColumnWidth(columnNum, columnWidth * 256);
             }
         }
+
+        /// <summary>
+        /// 将Sheet表数据读取到DataTable
+        /// </summary>
+        /// <param name="sheetName">Excel Sheet表名</param>
+        /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
+        /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
+        public DataTable ReadSheet(string sheetName, bool isReadTitle)
+        {
+            ISheet sheet = null;
+            DataTable data = null;
+
+            if (workbook == null)
+            {
+                throw new NullReferenceException("workbook为null，请先调用Open方法初始化workbook");
+            }
+
+            if (!string.IsNullOrWhiteSpace(sheetName))
+            {
+                sheet = GetSheet(sheetName);
+            }
+
+            if (sheet != null)
+            {
+                data = ReadSheet(sheet, isReadTitle);
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// 将Sheet表数据读取到DataTable
+        /// </summary>
+        /// <param name="sheet">Sheet表</param>
+        /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
+        /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
+        public DataTable ReadSheet(ISheet sheet, bool isReadTitle)
+        {
+            return ReadSheet(sheet, isReadTitle, 0);
+        }
+
+        /// <summary>
+        /// 将Sheet表数据读取到DataTable
+        /// </summary>
+        /// <param name="sheet">Sheet表</param>
+        /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
+        public DataTable ReadSheet(ISheet sheet, bool isReadTitle, int startRowNumber)
+        {
+            DataTable data = null;
+
+            if (sheet != null)
+            {
+                data = new DataTable();
+                IRow titleRow = sheet.GetRow(startRowNumber);
+
+                // 是否读取标题行
+                if (isReadTitle)
+                {
+                    var cols = ReadTitle(titleRow);
+                    if (cols != null)
+                    {
+                        data.Columns.AddRange(cols);
+                    }
+
+                    startRowNumber++;
+                }
+
+                // 读取数据
+                int rowCount = sheet.LastRowNum;
+                ReadContent(sheet, startRowNumber, rowCount, data);
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// 获取Sheet表的标题，读取第一行
+        /// </summary>
+        /// <param name="sheet">sheet表</param>
+        /// <returns>标题列数组</returns>
+        public DataColumn[] ReadTitle(ISheet sheet)
+        {
+            IRow firstRow = sheet.GetRow(0);
+            if (firstRow == null)
+            {
+                return new DataColumn[0];
+            }
+
+            return ReadTitle(firstRow);
+        }
+
+        /// <summary>
+        /// 从Row实例获取标题
+        /// </summary>
+        /// <param name="row">Row实例</param>
+        /// <returns>标题列数组</returns>
+        public DataColumn[] ReadTitle(IRow row)
+        {
+            int cellCount = row.LastCellNum;
+            DataColumn[] cols = new DataColumn[cellCount];
+
+            int j = 0;
+            for (int i = row.FirstCellNum; i < cellCount; i++)
+            {
+                DataColumn column = new DataColumn(row.GetCell(i).StringCellValue);
+                cols[j] = column;
+                j++;
+            }
+
+            return cols;
+        }
+
+        /// <summary>
+        /// 读取sheet表数据到DataTable中
+        /// </summary>
+        /// <param name="sheet">sheet表</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <param name="endRowNumber">终止行号</param>
+        /// <param name="table">要读入数据的DataTable</param>
+        /// <returns>读取的数据行数</returns>
+        public int ReadContent(ISheet sheet, int startRowNumber, int endRowNumber, DataTable table)
+        {
+            int columnCount = table.Columns.Count;
+            int rowCount = 0;
+            for (int i = startRowNumber; i <= endRowNumber; ++i)
+            {
+                IRow row = sheet.GetRow(i);
+                if (row == null) continue;
+
+                DataRow dataRow = table.NewRow();
+                for (int j = row.FirstCellNum; j < columnCount; ++j)
+                {
+                    var cell = row.GetCell(j);
+                    if (cell != null)
+                    {
+                        CellDataType cellDataType = CellDataType.Text;
+
+                        if (columnCount > 0)
+                        {
+                            cellDataType = GetCellDataTypeByColumn(table.Columns[j]);
+                        }
+                        else
+                        {
+                            cellDataType = GetCellDataTypeByCellType(cell.CellType);
+                        }
+
+                        dataRow[j] = ReadCell(cell, cellDataType);
+                    }
+                }
+
+                table.Rows.Add(dataRow);
+                rowCount++;
+            }
+
+            return rowCount;
+        }
+
+        /// <summary>
+        /// 读取单元格数据
+        /// </summary>
+        /// <param name="sheet">要读取数据的sheet表实例</param>
+        /// <param name="rowNumber">要读取数据的行号</param>
+        /// <param name="columnNumber">要读取数据的列号</param>
+        public object ReadCell(ISheet sheet, int rowNumber, int columnNumber, CellDataType cellDataType)
+        {
+            var row = sheet.GetRow(rowNumber);
+            if (row != null)
+            {
+                return ReadCell(row, columnNumber, cellDataType);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 读取单元格数据
+        /// </summary>
+        /// <param name="row">要读取数据的行实例</param>
+        /// <param name="columnNumber">要读取数据的列号</param>
+        public object ReadCell(IRow row, int columnNumber, CellDataType cellDataType)
+        {
+            var cell = row.GetCell(columnNumber);
+            if (cell != null)
+            {
+                return ReadCell(cell, cellDataType);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 读取单元格数据
+        /// </summary>
+        /// <param name="cell">要读取数据的单元格</param>
+        public object ReadCell(ICell cell, CellDataType cellDataType)
+        {
+            if (cellDataType == CellDataType.Boolean)
+            {
+                return cell.BooleanCellValue;
+            }
+            else if (cellDataType == CellDataType.Date)
+            {
+                return cell.DateCellValue;
+            }
+            else if (cellDataType == CellDataType.DateTime)
+            {
+                return cell.DateCellValue;
+            }
+            else if (cellDataType == CellDataType.Double)
+            {
+                return cell.NumericCellValue;
+            }
+            else if (cellDataType == CellDataType.Formula)
+            {
+                return cell.CellFormula;
+            }
+            else if (cellDataType == CellDataType.Int)
+            {
+                return cell.NumericCellValue;
+            }
+            else if (cellDataType == CellDataType.RichText)
+            {
+                return cell.RichStringCellValue;
+            }
+            else if (cellDataType == CellDataType.Text)
+            {
+                return cell.StringCellValue;
+            }
+            else if (cellDataType == CellDataType.None)
+            {
+                return string.Empty;
+            }
+            else if (cellDataType == CellDataType.Null)
+            {
+                return null;
+            }
+
+            return null;
+        }
+        #endregion
 
         /// <summary>
         /// 根据模板或数据excel文件创建工作簿实例
@@ -728,6 +757,156 @@ namespace FireflySoft.Excel
             }
 
             return workbook;
+        }
+
+        /// <summary>
+        /// 根据列属性获取数据类型
+        /// </summary>
+        /// <param name="column">列构造实例</param>
+        /// <returns></returns>
+        private CellDataType GetCellDataTypeByColumn(DataColumn column)
+        {
+            var cellDataType = CellDataType.None;
+
+            if (isUseBuiltInStyle)
+            {
+                if (column.ExtendedProperties != null && column.ExtendedProperties.Count > 0)
+                {
+                    if (column.ExtendedProperties.ContainsKey("DataType"))
+                    {
+                        var propertyValue = column.ExtendedProperties["DataType"].ToString();
+                        cellDataType = GetDataTypeFromColumnExtendedProperty(propertyValue);
+                    }
+                }
+                else
+                {
+                    Type columnDataType = column.DataType;
+                    cellDataType = GetDataTypeFromColumnDataType(columnDataType);
+                }
+            }
+
+            return cellDataType;
+        }
+
+        /// <summary>
+        /// 根据单元格类型获取数据类型
+        /// </summary>
+        /// <param name="cellType">单元格类型</param>
+        /// <returns></returns>
+        private CellDataType GetCellDataTypeByCellType(CellType cellType)
+        {
+            var cellDataType = CellDataType.None;
+
+            if (cellType == CellType.Blank)
+            {
+                cellDataType = CellDataType.None;
+            }
+            else if (cellType == CellType.Boolean)
+            {
+                cellDataType = CellDataType.Boolean;
+            }
+            else if (cellType == CellType.Error)
+            {
+                cellDataType = CellDataType.Text;
+            }
+            else if (cellType == CellType.Formula)
+            {
+                cellDataType = CellDataType.Formula;
+            }
+            else if (cellType == CellType.Numeric)
+            {
+                cellDataType = CellDataType.Double;
+            }
+            else if (cellType == CellType.String)
+            {
+                cellDataType = CellDataType.Text;
+            }
+            else if (cellType == CellType.Unknown)
+            {
+                cellDataType = CellDataType.Text;
+            }
+
+            return cellDataType;
+        }
+
+        /// <summary>
+        /// 从数据列的类型获取DataType
+        /// </summary>
+        /// <param name="type">数据类型</param>
+        /// <returns>单元格数据类型</returns>
+        private static CellDataType GetDataTypeFromColumnDataType(Type type)
+        {
+            var dataType = CellDataType.None;
+
+            if (type == typeof(DateTime))
+            {
+                dataType = CellDataType.DateTime;
+            }
+            else if (type == typeof(int))
+            {
+                dataType = CellDataType.Int;
+            }
+            else if (type == typeof(double))
+            {
+                dataType = CellDataType.Double;
+            }
+            else if (type == typeof(decimal))
+            {
+                dataType = CellDataType.Double;
+            }
+            else if (type == typeof(bool))
+            {
+                dataType = CellDataType.Boolean;
+            }
+            else
+            {
+                dataType = CellDataType.Text;
+            }
+
+            return dataType;
+        }
+
+        /// <summary>
+        /// 从列的扩展属性获取DataType
+        /// </summary>
+        /// <param name="propertyValue">属性值</param>
+        /// <returns>单元格数据类型</returns>
+        private static CellDataType GetDataTypeFromColumnExtendedProperty(string propertyValue)
+        {
+            var dataType = CellDataType.None;
+
+            switch (propertyValue)
+            {
+                case "Null":
+                    dataType = CellDataType.Null;
+                    break;
+                case "Date":
+                    dataType = CellDataType.Date;
+                    break;
+                case "DateTime":
+                    dataType = CellDataType.DateTime;
+                    break;
+                case "Int":
+                    dataType = CellDataType.Int;
+                    break;
+                case "Double":
+                    dataType = CellDataType.Double;
+                    break;
+                case "Boolean":
+                    dataType = CellDataType.Boolean;
+                    break;
+                case "Formula":
+                    dataType = CellDataType.Formula;
+                    break;
+                case "RichText":
+                    dataType = CellDataType.RichText;
+                    break;
+                default:
+                    dataType = CellDataType.Text;
+                    break;
+            }
+
+            return dataType;
         }
     }
 }
