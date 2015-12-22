@@ -58,13 +58,14 @@ namespace FireflySoft.Excel
         /// <param name="dataFilePath">Excel数据文件物理路径</param>
         public NPOIOperator(string templateFilePath, string dataFilePath, bool isUseBuiltInStyle)
         {
-            InitTitleStyle();
-            InitContentStyle();
-
             this.isUseBuiltInStyle = isUseBuiltInStyle;
             this.dataFilePath = dataFilePath;
             this.templateFilePath = templateFilePath;
+
             CreateWorkbook();
+
+            InitTitleStyle();
+            InitContentStyle();
         }
 
         /// <summary>
