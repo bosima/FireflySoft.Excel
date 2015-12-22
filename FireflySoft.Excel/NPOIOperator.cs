@@ -10,7 +10,7 @@ using System.Text;
 
 namespace FireflySoft.Excel
 {
-    public class NPOIExcelOperator
+    public class NPOIOperator
     {
         /// <summary>
         /// Excel数据文件物理路径
@@ -46,7 +46,7 @@ namespace FireflySoft.Excel
         /// 初始化构造函数
         /// </summary>
         /// <param name="dataFilePath">Excel数据文件物理路径</param>
-        public NPOIExcelOperator(string dataFilePath, bool isUseBuiltInStyle)
+        public NPOIOperator(string dataFilePath, bool isUseBuiltInStyle)
             : this(string.Empty, dataFilePath, isUseBuiltInStyle)
         {
         }
@@ -56,7 +56,7 @@ namespace FireflySoft.Excel
         /// </summary>
         /// <param name="templateFilePath">Excel模板文件物理路径</param>
         /// <param name="dataFilePath">Excel数据文件物理路径</param>
-        public NPOIExcelOperator(string templateFilePath, string dataFilePath, bool isUseBuiltInStyle)
+        public NPOIOperator(string templateFilePath, string dataFilePath, bool isUseBuiltInStyle)
         {
             InitTitleStyle();
             InitContentStyle();

@@ -60,7 +60,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CellDataType.cs" />
-    <Compile Include="NPOIExcelOperator.cs" />
+    <Compile Include="NPOIOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
