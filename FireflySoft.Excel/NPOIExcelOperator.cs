@@ -279,7 +279,7 @@ namespace FireflySoft.Excel
         }
 
         /// <summary>
-        /// 写入数据到内容行
+        /// 写入数据到内容
         /// </summary>
         /// <param name="sheet"></param>
         /// <param name="data"></param>
@@ -293,23 +293,34 @@ namespace FireflySoft.Excel
                 IRow row = sheet.CreateRow(strartRowNumber);
                 row.Height = 26 * 20;
 
-                for (int j = 0; j < data.Columns.Count; ++j)
-                {
-                    var cell = row.CreateCell(j);
-
-                    CellDataType cellDataType = CellDataType.None;
-                    if (data.Rows[i][j] != null)
-                    {
-                        cellDataType = GetCellDataTypeByColumn(data.Columns[j]);
-                    }
-
-                    WriteCell(cell, data.Rows[i][j], cellDataType);
-                }
+                WriteRow(row, data.Columns, data.Rows[i]);
 
                 strartRowNumber++;
             }
 
             return strartRowNumber;
+        }
+
+        /// <summary>
+        /// 写入数据到某一行
+        /// </summary>
+        /// <param name="row"></param>
+        /// <param name="data"></param>
+        /// <param name="cols"></param>
+        public void WriteRow(IRow row, DataColumnCollection cols, DataRow data)
+        {
+            for (int j = 0; j < cols.Count; ++j)
+            {
+                var cell = row.CreateCell(j);
+
+                CellDataType cellDataType = CellDataType.None;
+                if (data[j] != null)
+                {
+                    cellDataType = GetCellDataTypeByColumn(cols[j]);
+                }
+
+                WriteCell(cell, data[j], cellDataType);
+            }
         }
 
         /// <summary>
@@ -595,32 +606,60 @@ namespace FireflySoft.Excel
                 IRow row = sheet.GetRow(i);
                 if (row == null) continue;
 
-                DataRow dataRow = table.NewRow();
-                for (int j = row.FirstCellNum; j < columnCount; ++j)
+                var rowData = ReadRow(row, table.Columns);
+                if (rowData != null)
                 {
-                    var cell = row.GetCell(j);
-                    if (cell != null)
+                    DataRow dataRow = table.NewRow();
+                    for (int j = 0; j < rowData.Length; j++)
                     {
-                        CellDataType cellDataType = CellDataType.Text;
-
-                        if (columnCount > 0)
-                        {
-                            cellDataType = GetCellDataTypeByColumn(table.Columns[j]);
-                        }
-                        else
-                        {
-                            cellDataType = GetCellDataTypeByCellType(cell.CellType);
-                        }
-
-                        dataRow[j] = ReadCell(cell, cellDataType);
+                        dataRow[j] = rowData[j];
                     }
+
+                    table.Rows.Add(dataRow);
                 }
 
-                table.Rows.Add(dataRow);
                 rowCount++;
             }
 
             return rowCount;
+        }
+
+        /// <summary>
+        /// 读取一行数据
+        /// </summary>
+        /// <param name="row"></param>
+        /// <param name="cols"></param>
+        /// <returns></returns>
+        public object[] ReadRow(IRow row, DataColumnCollection cols)
+        {
+            if (cols.Count == 0)
+            {
+                return null;
+            }
+
+            object[] data = new object[cols.Count - row.FirstCellNum];
+
+            for (int j = row.FirstCellNum; j < cols.Count; ++j)
+            {
+                var cell = row.GetCell(j);
+                if (cell != null)
+                {
+                    CellDataType cellDataType = CellDataType.Text;
+
+                    if (cols.Count > 0)
+                    {
+                        cellDataType = GetCellDataTypeByColumn(cols[j]);
+                    }
+                    else
+                    {
+                        cellDataType = GetCellDataTypeByCellType(cell.CellType);
+                    }
+
+                    data[j] = ReadCell(cell, cellDataType);
+                }
+            }
+
+            return data;
         }
 
         /// <summary>
