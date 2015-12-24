@@ -149,7 +149,7 @@ namespace FireflySoft.Excel
         /// <returns></returns>
         public ISheet GetSheet(string sheetName)
         {
-            if (!string.IsNullOrWhiteSpace(sheetName))
+            if (string.IsNullOrWhiteSpace(sheetName))
             {
                 throw new ArgumentNullException("sheetName为空");
             }
@@ -166,7 +166,10 @@ namespace FireflySoft.Excel
         {
             if (index >= 0)
             {
-                return workbook.GetSheetAt(index);
+                if (workbook.NumberOfSheets >= index + 1)
+                {
+                    return workbook.GetSheetAt(index);
+                }
             }
 
             return null;
@@ -179,12 +182,21 @@ namespace FireflySoft.Excel
         /// <returns></returns>
         public ISheet CreateSheet(string sheetName)
         {
-            if (!string.IsNullOrWhiteSpace(sheetName))
+            if (string.IsNullOrWhiteSpace(sheetName))
             {
                 throw new ArgumentNullException("sheetName为空");
             }
 
             return workbook.CreateSheet(sheetName);
+        }
+
+        /// <summary>
+        /// 获取Sheet表数量
+        /// </summary>
+        /// <returns></returns>
+        public int GetSheetCount()
+        {
+            return workbook.NumberOfSheets;
         }
 
         #region 写数据
@@ -271,7 +283,7 @@ namespace FireflySoft.Excel
         /// <param name="columns"></param>
         public void WriteTitle(IRow row, DataColumnCollection columns)
         {
-            for (int j = 0; j < columns.Count; ++j)
+            for (int j = 0; j < columns.Count; j++)
             {
                 var cell = row.CreateCell(j);
                 cell.SetCellValue(columns[j].ColumnName);
@@ -289,7 +301,7 @@ namespace FireflySoft.Excel
         public int WriteContent(ISheet sheet, DataTable data, int strartRowNumber)
         {
             // 创建内容行
-            for (int i = 0; i < data.Rows.Count; ++i)
+            for (int i = 0; i < data.Rows.Count; i++)
             {
                 IRow row = sheet.CreateRow(strartRowNumber);
                 row.Height = 26 * 20;
@@ -310,7 +322,7 @@ namespace FireflySoft.Excel
         /// <param name="cols"></param>
         public void WriteRow(IRow row, DataColumnCollection cols, DataRow data)
         {
-            for (int j = 0; j < cols.Count; ++j)
+            for (int j = 0; j < cols.Count; j++)
             {
                 var cell = row.CreateCell(j);
 
@@ -526,16 +538,29 @@ namespace FireflySoft.Excel
         /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
         public DataTable ReadSheet(ISheet sheet, bool isReadTitle, int startRowNumber)
         {
+            return ReadSheet(sheet, isReadTitle, startRowNumber, false);
+        }
+
+        /// <summary>
+        /// 将Sheet表数据读取到DataTable
+        /// </summary>
+        /// <param name="sheet">Sheet表</param>
+        /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <param name="useCellType">是否使用单元格的数据类型格式化数据，如果列中的数据类型都是一致的可以设置为true，否则使用DataTable中列的数据类型读取数据。</param>
+        /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
+        public DataTable ReadSheet(ISheet sheet, bool isReadTitle, int startRowNumber, bool useCellType)
+        {
             DataTable data = null;
 
             if (sheet != null)
             {
                 data = new DataTable();
-                IRow titleRow = sheet.GetRow(startRowNumber);
 
                 // 是否读取标题行
                 if (isReadTitle)
                 {
+                    IRow titleRow = sheet.GetRow(startRowNumber);
                     var cols = ReadTitle(titleRow);
                     if (cols != null)
                     {
@@ -547,7 +572,7 @@ namespace FireflySoft.Excel
 
                 // 读取数据
                 int rowCount = sheet.LastRowNum;
-                ReadContent(sheet, startRowNumber, rowCount, data);
+                ReadContent(sheet, startRowNumber, rowCount, data, useCellType);
             }
 
             return data;
@@ -600,16 +625,38 @@ namespace FireflySoft.Excel
         /// <returns>读取的数据行数</returns>
         public int ReadContent(ISheet sheet, int startRowNumber, int endRowNumber, DataTable table)
         {
+            return ReadContent(sheet, startRowNumber, endRowNumber, table, false);
+        }
+
+        /// <summary>
+        /// 读取sheet表数据到DataTable中
+        /// </summary>
+        /// <param name="sheet">sheet表</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <param name="endRowNumber">终止行号</param>
+        /// <param name="table">要读入数据的DataTable</param>
+        /// <param name="useCellType">是否使用单元格的数据类型格式化数据，如果列中的数据类型都是一致的可以设置为true，否则使用DataTable中列的数据类型读取数据。</param>
+        /// <returns>读取的数据行数</returns>
+        public int ReadContent(ISheet sheet, int startRowNumber, int endRowNumber, DataTable table, bool useCellType)
+        {
             int columnCount = table.Columns.Count;
             int rowCount = 0;
-            for (int i = startRowNumber; i <= endRowNumber; ++i)
+            for (int i = startRowNumber; i <= endRowNumber; i++)
             {
                 IRow row = sheet.GetRow(i);
                 if (row == null) continue;
 
-                var rowData = ReadRow(row, table.Columns);
+                var rowData = ReadRow(row, table.Columns, useCellType);
                 if (rowData != null)
                 {
+                    if (useCellType)
+                    {
+                        if (i == startRowNumber)
+                        {
+                            InitColumnTypeWithCellType(table.Columns, rowData);
+                        }
+                    }
+
                     DataRow dataRow = table.NewRow();
                     for (int j = 0; j < rowData.Length; j++)
                     {
@@ -625,6 +672,7 @@ namespace FireflySoft.Excel
             return rowCount;
         }
 
+
         /// <summary>
         /// 读取一行数据
         /// </summary>
@@ -633,6 +681,18 @@ namespace FireflySoft.Excel
         /// <returns></returns>
         public object[] ReadRow(IRow row, DataColumnCollection cols)
         {
+            return ReadRow(row, cols, false);
+        }
+
+        /// <summary>
+        /// 读取一行数据
+        /// </summary>
+        /// <param name="row">行对象</param>
+        /// <param name="cols">列集合</param>
+        /// <param name="useCellType">是否使用单元格的数据类型格式化数据，如果列中的数据类型都是一致的可以设置为true，否则使用DataTable中列的数据类型读取数据。</param>
+        /// <returns></returns>
+        public object[] ReadRow(IRow row, DataColumnCollection cols, bool useCellType)
+        {
             if (cols.Count == 0)
             {
                 return null;
@@ -640,20 +700,20 @@ namespace FireflySoft.Excel
 
             object[] data = new object[cols.Count - row.FirstCellNum];
 
-            for (int j = row.FirstCellNum; j < cols.Count; ++j)
+            for (int j = row.FirstCellNum; j < cols.Count; j++)
             {
                 var cell = row.GetCell(j);
                 if (cell != null)
                 {
                     CellDataType cellDataType = CellDataType.Text;
 
-                    if (cols.Count > 0)
+                    if (useCellType)
                     {
-                        cellDataType = GetCellDataTypeByColumn(cols[j]);
+                        cellDataType = GetCellDataTypeByCell(cell);
                     }
                     else
                     {
-                        cellDataType = GetCellDataTypeByCellType(cell.CellType);
+                        cellDataType = GetCellDataTypeByColumn(cols[j]);
                     }
 
                     data[j] = ReadCell(cell, cellDataType);
@@ -724,7 +784,7 @@ namespace FireflySoft.Excel
             }
             else if (cellDataType == CellDataType.Int)
             {
-                return cell.NumericCellValue;
+                return (int)cell.NumericCellValue;
             }
             else if (cellDataType == CellDataType.RichText)
             {
@@ -732,7 +792,7 @@ namespace FireflySoft.Excel
             }
             else if (cellDataType == CellDataType.Text)
             {
-                return cell.StringCellValue;
+                return cell.ToString();
             }
             else if (cellDataType == CellDataType.None)
             {
@@ -797,6 +857,26 @@ namespace FireflySoft.Excel
             }
 
             return workbook;
+        }
+
+        /// <summary>
+        /// 使用CellType初始化列的数据类型
+        /// </summary>
+        /// <param name="cols"></param>
+        /// <param name="rowData"></param>
+        private static void InitColumnTypeWithCellType(DataColumnCollection cols, object[] rowData)
+        {
+            for (int k = 0; k < rowData.Length; k++)
+            {
+                var o = rowData[k];
+                if (o != null)
+                {
+                    if (cols.Count > k)
+                    {
+                        cols[k].DataType = o.GetType();
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -867,6 +947,30 @@ namespace FireflySoft.Excel
             }
 
             return cellDataType;
+        }
+
+        /// <summary>
+        /// 根据单元格类型获取数据类型
+        /// </summary>
+        /// <param name="cellType">单元格类型</param>
+        /// <returns></returns>
+        private CellDataType GetCellDataTypeByCell(ICell cell)
+        {
+            if (cell != null)
+            {
+                var cellType = GetCellDataTypeByCellType(cell.CellType);
+                if (cellType == CellDataType.Double)
+                {
+                    if (!cell.NumericCellValue.ToString().Contains("."))
+                    {
+                        cellType = CellDataType.Int;
+                    }
+                }
+
+                return cellType;
+            }
+
+            return CellDataType.None;
         }
 
         /// <summary>
