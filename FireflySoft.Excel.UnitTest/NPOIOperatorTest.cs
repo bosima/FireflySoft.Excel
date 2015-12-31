@@ -86,6 +86,22 @@ namespace FireflySoft.Excel.UnitTest
         }
 
         [TestMethod]
+        public void TestWriteSheetWithSheetInstance()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var writeLineNumber = oper.WriteSheet(sheet, dt, true);
+            Assert.AreEqual(4, writeLineNumber);
+
+            var readDT = oper.ReadSheet("Sheet3", true);
+            Assert.AreEqual(3, readDT.Rows.Count);
+        }
+
+        [TestMethod]
         public void TestReadSheetAndUseCellType()
         {
             var dt = GetTestData();
