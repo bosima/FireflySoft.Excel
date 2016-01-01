@@ -86,6 +86,21 @@ namespace FireflySoft.Excel.UnitTest
         }
 
         [TestMethod]
+        public void TestWriteSheetWithSheetNameAndNoTitle()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var writeLineNumber = oper.WriteSheet("Sheet3", dt, false);
+            Assert.AreEqual(3, writeLineNumber);
+
+            var readDT = oper.ReadSheet("Sheet3", false);
+            Assert.AreEqual(3, readDT.Rows.Count);
+        }
+
+        [TestMethod]
         public void TestWriteSheetWithSheetInstance()
         {
             var dt = GetTestData();
@@ -99,6 +114,187 @@ namespace FireflySoft.Excel.UnitTest
 
             var readDT = oper.ReadSheet("Sheet3", true);
             Assert.AreEqual(3, readDT.Rows.Count);
+        }
+
+        [TestMethod]
+        public void TestWriteSheetWithSheetInstanceAndNoTitle()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var writeLineNumber = oper.WriteSheet(sheet, dt, false);
+            Assert.AreEqual(3, writeLineNumber);
+
+            var readDT = oper.ReadSheet("Sheet3", false);
+            Assert.AreEqual(3, readDT.Rows.Count);
+        }
+
+        [TestMethod]
+        public void TestWriteSheetWithSheetInstanceAndRowNumber()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var writeLineNumber = oper.WriteSheet(sheet, dt, true, 2);
+            Assert.AreEqual(6, writeLineNumber);
+
+            var readDT = oper.ReadSheet(sheet, true, 2);
+            Assert.AreEqual(3, readDT.Rows.Count);
+
+            Assert.AreEqual("李四", readDT.Rows[1]["姓名"].ToString());
+        }
+
+        [TestMethod]
+        public void TestWriteSheetWithSheetInstanceAndRowNumberAndNoTitle()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var writeLineNumber = oper.WriteSheet(sheet, dt, false, 2);
+            Assert.AreEqual(5, writeLineNumber);
+
+            var readDT = oper.ReadSheet(sheet, false, 2);
+            Assert.AreEqual(3, readDT.Rows.Count);
+
+            Assert.AreEqual("李四", readDT.Rows[1]["列2"].ToString());
+        }
+
+        [TestMethod]
+        public void TestWriteTitle()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            oper.WriteTitle(sheet, dt.Columns);
+
+            var cols = oper.ReadTitle(sheet);
+            Assert.AreEqual(5, cols.Length);
+            Assert.AreEqual("姓名", cols[1].ColumnName);
+        }
+
+        [TestMethod]
+        public void TestWriteTitleWithRow()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var row = sheet.CreateRow(0);
+            oper.WriteTitle(row, dt.Columns);
+
+            var cols = oper.ReadTitle(sheet);
+            Assert.AreEqual(5, cols.Length);
+            Assert.AreEqual("姓名", cols[1].ColumnName);
+        }
+
+        [TestMethod]
+        public void TestWriteContent()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var writeLineNumber = oper.WriteContent(sheet, dt, 2);
+            Assert.AreEqual(5, writeLineNumber);
+
+            var readDT = oper.ReadSheet(sheet, false, 2);
+            Assert.AreEqual(3, readDT.Rows.Count);
+
+            Assert.AreEqual("李四", readDT.Rows[1]["列2"].ToString());
+        }
+
+        [TestMethod]
+        public void TestWriteRow()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var row = sheet.CreateRow(1);
+            oper.WriteRow(row, dt.Columns, dt.Rows[1]);
+
+            var readDT = oper.ReadSheet(sheet, false, 1);
+            Assert.AreEqual(1, readDT.Rows.Count);
+            Assert.AreEqual("李四", readDT.Rows[0]["列2"].ToString());
+        }
+
+        [TestMethod]
+        public void TestWriteCellWithSheet()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            oper.WriteCell(sheet, 1, 1, dt.Rows[1]["姓名"], CellDataType.Text);
+            oper.WriteCell(sheet, 1, 2, dt.Rows[1]["性别"], CellDataType.Int);
+
+            var readDT = oper.ReadSheet(sheet, false, 1, true);
+            Assert.AreEqual(1, readDT.Rows.Count);
+            Assert.AreEqual("李四", readDT.Rows[0]["列1"].ToString());
+            Assert.AreEqual(0, readDT.Rows[0]["列2"]);
+        }
+
+        [TestMethod]
+        public void TestWriteCellWithRow()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+            var row = sheet.CreateRow(0);
+            oper.WriteCell(row, 1, dt.Rows[1]["姓名"], CellDataType.Text);
+            oper.WriteCell(row, 2, dt.Rows[1]["性别"], CellDataType.Int);
+
+            var readDT = oper.ReadSheet(sheet, false, 0, true);
+            Assert.AreEqual(1, readDT.Rows.Count);
+            Assert.AreEqual("李四", readDT.Rows[0]["列1"].ToString());
+            Assert.AreEqual(0, readDT.Rows[0]["列2"]);
+        }
+
+        [TestMethod]
+        public void TestWriteCell()
+        {
+            var dt = GetTestData();
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "onesheetfile.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet("Sheet3");
+
+            var row = sheet.CreateRow(0);
+
+            var cell1 = row.CreateCell(0);
+            oper.WriteCell(cell1, dt.Rows[1]["姓名"], CellDataType.Text);
+
+            var cell2 = row.CreateCell(1);
+            oper.WriteCell(cell2, dt.Rows[1]["性别"], CellDataType.Int);
+
+            var readDT = oper.ReadSheet(sheet, false, 0, true);
+            Assert.AreEqual(1, readDT.Rows.Count);
+            Assert.AreEqual("李四", readDT.Rows[0]["列1"].ToString());
+            Assert.AreEqual(0, readDT.Rows[0]["列2"]);
         }
 
         [TestMethod]

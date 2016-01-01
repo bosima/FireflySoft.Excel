@@ -241,7 +241,7 @@ namespace FireflySoft.Excel
         /// <param name="sheet">Sheet表</param>
         /// <param name="data">DataTable数据</param>
         /// <param name="isWriteTitle">是否写入DataTable列名作为Sheet表标题</param>
-        /// <param name="startRowNumber">开始写入数据的行号（从0开始）</param>
+        /// <param name="startRowNumber">开始写入数据的行号（有效索引从0开始）</param>
         /// <returns>写入的最后行号</returns>
         public int WriteSheet(ISheet sheet, DataTable data, bool isWriteTitle, int startRowNumber)
         {
@@ -569,6 +569,20 @@ namespace FireflySoft.Excel
 
                     startRowNumber++;
                 }
+                else
+                {
+                    // 如果不读取标题行，则从数据第一行获取列数
+                    var row = sheet.GetRow(startRowNumber);
+                    if (row != null)
+                    {
+                        var colCount = row.Cells.Count;
+                        for (int i = 0; i < colCount; i++)
+                        {
+                            data.Columns.Add("列" + (i + 1));
+                        }
+                    }
+
+                }
 
                 // 读取数据
                 int rowCount = sheet.LastRowNum;
@@ -698,9 +712,11 @@ namespace FireflySoft.Excel
                 return null;
             }
 
-            object[] data = new object[cols.Count - row.FirstCellNum];
+            var lastCellNum = row.FirstCellNum + cols.Count - 1;
 
-            for (int j = row.FirstCellNum; j < cols.Count; j++)
+            int i = 0;
+            object[] data = new object[cols.Count];
+            for (int j = row.FirstCellNum; j <= lastCellNum; j++)
             {
                 var cell = row.GetCell(j);
                 if (cell != null)
@@ -713,11 +729,13 @@ namespace FireflySoft.Excel
                     }
                     else
                     {
-                        cellDataType = GetCellDataTypeByColumn(cols[j]);
+                        cellDataType = GetCellDataTypeByColumn(cols[i]);
                     }
 
-                    data[j] = ReadCell(cell, cellDataType);
+                    data[i] = ReadCell(cell, cellDataType);
                 }
+
+                i++;
             }
 
             return data;
