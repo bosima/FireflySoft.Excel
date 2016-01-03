@@ -69,6 +69,9 @@
     <None Include="file\data.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="file\forread.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="file\onesheetfile.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

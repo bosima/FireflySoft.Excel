@@ -1,5 +1,6 @@
 ﻿using NPOI.HSSF.UserModel;
 using NPOI.SS.UserModel;
+using NPOI.XSSF.Model;
 using NPOI.XSSF.UserModel;
 using System;
 using System.Collections.Generic;
@@ -585,8 +586,7 @@ namespace FireflySoft.Excel
                 }
 
                 // 读取数据
-                int rowCount = sheet.LastRowNum;
-                ReadContent(sheet, startRowNumber, rowCount, data, useCellType);
+                ReadContent(sheet, startRowNumber, data, useCellType);
             }
 
             return data;
@@ -627,6 +627,32 @@ namespace FireflySoft.Excel
             }
 
             return cols;
+        }
+
+        /// <summary>
+        /// 读取sheet表数据到DataTable中
+        /// </summary>
+        /// <param name="sheet">sheet表</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <param name="table">要读入数据的DataTable</param>
+        /// <returns>读取的数据行数</returns>
+        public int ReadContent(ISheet sheet, int startRowNumber, DataTable table)
+        {
+            return ReadContent(sheet, startRowNumber, table, false);
+        }
+
+        /// <summary>
+        /// 读取sheet表数据到DataTable中
+        /// </summary>
+        /// <param name="sheet">sheet表</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <param name="table">要读入数据的DataTable</param>
+        /// <param name="useCellType">是否使用单元格的数据类型格式化数据，如果列中的数据类型都是一致的可以设置为true，否则使用DataTable中列的数据类型读取数据。</param>
+        /// <returns>读取的数据行数</returns>
+        public int ReadContent(ISheet sheet, int startRowNumber, DataTable table, bool useCellType)
+        {
+            int endRowNumber = sheet.LastRowNum;
+            return ReadContent(sheet, startRowNumber, endRowNumber, table, useCellType);
         }
 
         /// <summary>
@@ -685,7 +711,6 @@ namespace FireflySoft.Excel
 
             return rowCount;
         }
-
 
         /// <summary>
         /// 读取一行数据
@@ -931,61 +956,58 @@ namespace FireflySoft.Excel
         /// </summary>
         /// <param name="cellType">单元格类型</param>
         /// <returns></returns>
-        private CellDataType GetCellDataTypeByCellType(CellType cellType)
-        {
-            var cellDataType = CellDataType.None;
-
-            if (cellType == CellType.Blank)
-            {
-                cellDataType = CellDataType.None;
-            }
-            else if (cellType == CellType.Boolean)
-            {
-                cellDataType = CellDataType.Boolean;
-            }
-            else if (cellType == CellType.Error)
-            {
-                cellDataType = CellDataType.Text;
-            }
-            else if (cellType == CellType.Formula)
-            {
-                cellDataType = CellDataType.Formula;
-            }
-            else if (cellType == CellType.Numeric)
-            {
-                cellDataType = CellDataType.Double;
-            }
-            else if (cellType == CellType.String)
-            {
-                cellDataType = CellDataType.Text;
-            }
-            else if (cellType == CellType.Unknown)
-            {
-                cellDataType = CellDataType.Text;
-            }
-
-            return cellDataType;
-        }
-
-        /// <summary>
-        /// 根据单元格类型获取数据类型
-        /// </summary>
-        /// <param name="cellType">单元格类型</param>
-        /// <returns></returns>
         private CellDataType GetCellDataTypeByCell(ICell cell)
         {
             if (cell != null)
             {
-                var cellType = GetCellDataTypeByCellType(cell.CellType);
-                if (cellType == CellDataType.Double)
+                var cellType = cell.CellType;
+                var cellDataType = CellDataType.None;
+                var cellStyle = cell.CellStyle;
+                var cellFormaStringt = cellStyle.GetDataFormatString();
+
+                if (cellType == CellType.Blank)
                 {
-                    if (!cell.NumericCellValue.ToString().Contains("."))
+                    cellDataType = CellDataType.None;
+                }
+                else if (cellType == CellType.Boolean)
+                {
+                    cellDataType = CellDataType.Boolean;
+                }
+                else if (cellType == CellType.Error)
+                {
+                    cellDataType = CellDataType.Text;
+                }
+                else if (cellType == CellType.Formula)
+                {
+                    cellDataType = CellDataType.Formula;
+                }
+                else if (cellType == CellType.Numeric)
+                {
+                    cellDataType = CellDataType.Double;
+
+                    // TODO:简单点可以尝试访问 cell.DateCellValue，不过可能引发异常
+                    if (cellFormaStringt == "m/d/yy" || cellFormaStringt == "yyyy-MM-dd")
                     {
-                        cellType = CellDataType.Int;
+                        cellDataType = CellDataType.Date;
+                    }
+                    else if (cellFormaStringt == "m/d/yy h:mm" || cellFormaStringt == "yyyy-MM-dd HH:mm:ss")
+                    {
+                        cellDataType = CellDataType.DateTime;
+                    }
+                    else if (!cell.NumericCellValue.ToString().Contains("."))
+                    {
+                        cellDataType = CellDataType.Int;
                     }
                 }
-
-                return cellType;
+                else if (cellType == CellType.String)
+                {
+                    cellDataType = CellDataType.Text;
+                }
+                else if (cellType == CellType.Unknown)
+                {
+                    cellDataType = CellDataType.Text;
+                }
+                return cellDataType;
             }
 
             return CellDataType.None;

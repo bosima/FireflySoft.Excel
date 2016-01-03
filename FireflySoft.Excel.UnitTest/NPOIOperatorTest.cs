@@ -298,6 +298,129 @@ namespace FireflySoft.Excel.UnitTest
         }
 
         [TestMethod]
+        public void TestReadSheetWithName()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var readDT = oper.ReadSheet("Sheet1", true);
+            Assert.AreEqual(6, readDT.Rows.Count);
+            Assert.AreEqual("猴六", readDT.Rows[3]["姓名"].ToString());
+            Assert.AreEqual("14-3月-1988", readDT.Rows[3]["出生日期"]);
+        }
+
+        [TestMethod]
+        public void TestReadSheetWithNameAndNoTitle()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var readDT = oper.ReadSheet("Sheet1", false);
+            Assert.AreEqual(7, readDT.Rows.Count);
+            Assert.AreEqual("猴六", readDT.Rows[4]["列2"].ToString());
+            Assert.AreEqual("14-3月-1988", readDT.Rows[4]["列5"]);
+        }
+
+        [TestMethod]
+        public void TestReadSheetWithSheet()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var readDT = oper.ReadSheet(sheet, true);
+            Assert.AreEqual(6, readDT.Rows.Count);
+            Assert.AreEqual("猴六", readDT.Rows[3]["姓名"].ToString());
+            Assert.AreEqual("14-3月-1988", readDT.Rows[3]["出生日期"]);
+        }
+
+        [TestMethod]
+        public void TestReadSheetWithSheetAndNoTitle()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var readDT = oper.ReadSheet(sheet, false);
+            Assert.AreEqual(7, readDT.Rows.Count);
+            Assert.AreEqual("猴六", readDT.Rows[4]["列2"].ToString());
+            Assert.AreEqual("14-3月-1988", readDT.Rows[4]["列5"]);
+        }
+
+        [TestMethod]
+        public void TestReadSheetWithFirstLine()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var readDT = oper.ReadSheet(sheet, true, 0);
+            Assert.AreEqual(6, readDT.Rows.Count);
+            Assert.AreEqual("猴六", readDT.Rows[3]["姓名"].ToString());
+            Assert.AreEqual("14-3月-1988", readDT.Rows[3]["出生日期"]);
+        }
+
+        [TestMethod]
+        public void TestReadSheetWithSencondLine()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var readDT = oper.ReadSheet(sheet, false, 1);
+            Assert.AreEqual(6, readDT.Rows.Count);
+            Assert.AreEqual("猴六", readDT.Rows[3]["列2"].ToString());
+            Assert.AreEqual("14-3月-1988", readDT.Rows[3]["列5"]);
+        }
+
+        [TestMethod]
+        public void TestReadSheetWithCellType()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var readDT = oper.ReadSheet(sheet, true, 0, true);
+            Assert.AreEqual(6, readDT.Rows.Count);
+            Assert.AreEqual("猴六", readDT.Rows[3]["姓名"].ToString());
+            Assert.AreEqual(new DateTime(1988, 3, 14), readDT.Rows[3]["出生日期"]);
+        }
+
+        [TestMethod]
+        public void TestReadTitleWithSheet()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var cols = oper.ReadTitle(sheet);
+
+            Assert.AreEqual(5, cols.Length);
+            Assert.AreEqual("出生日期", cols[4].ColumnName);
+        }
+
+        [TestMethod]
+        public void TestReadTitleWithRow()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var firstRow = sheet.GetRow(0);
+
+            var cols = oper.ReadTitle(firstRow);
+            Assert.AreEqual(5, cols.Length);
+            Assert.AreEqual("出生日期", cols[4].ColumnName);
+        }
+
+        [TestMethod]
+        public void TestReadContent()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var dataTable = GetTestDataSchema();
+            var readCount = oper.ReadContent(sheet, 1, 6, dataTable);
+
+            Assert.AreEqual(6, readCount);
+            Assert.AreEqual("猴六", dataTable.Rows[3]["姓名"].ToString());
+            Assert.AreEqual(new DateTime(1988, 3, 14), dataTable.Rows[3]["出生日期"]);
+        }
+
+        [TestMethod]
         public void TestReadSheetAndUseCellType()
         {
             var dt = GetTestData();
@@ -314,14 +437,7 @@ namespace FireflySoft.Excel.UnitTest
 
         private DataTable GetTestData()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.Add("学号", typeof(string));
-            dt.Columns.Add("姓名", typeof(string));
-            dt.Columns.Add("性别", typeof(int));
-            dt.Columns.Add("班级", typeof(string));
-
-            var birthdayColumn = dt.Columns.Add("出生日期", typeof(DateTime));
-            birthdayColumn.ExtendedProperties.Add("DataType", "Date");
+            DataTable dt = GetTestDataSchema();
 
             var row1 = dt.NewRow();
             row1[0] = "030601";
@@ -347,6 +463,19 @@ namespace FireflySoft.Excel.UnitTest
             row3[4] = new DateTime(1999, 6, 6);
             dt.Rows.Add(row3);
 
+            return dt;
+        }
+
+        private DataTable GetTestDataSchema()
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.Add("学号", typeof(string));
+            dt.Columns.Add("姓名", typeof(string));
+            dt.Columns.Add("性别", typeof(int));
+            dt.Columns.Add("班级", typeof(string));
+
+            var birthdayColumn = dt.Columns.Add("出生日期", typeof(DateTime));
+            birthdayColumn.ExtendedProperties.Add("DataType", "Date");
             return dt;
         }
     }
