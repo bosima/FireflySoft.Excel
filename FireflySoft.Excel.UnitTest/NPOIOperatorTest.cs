@@ -248,7 +248,7 @@ namespace FireflySoft.Excel.UnitTest
             oper.WriteCell(sheet, 1, 1, dt.Rows[1]["姓名"], CellDataType.Text);
             oper.WriteCell(sheet, 1, 2, dt.Rows[1]["性别"], CellDataType.Int);
 
-            var readDT = oper.ReadSheet(sheet, false, 1, true);
+            var readDT = oper.ReadSheet(sheet, false, true, 1);
             Assert.AreEqual(1, readDT.Rows.Count);
             Assert.AreEqual("李四", readDT.Rows[0]["列1"].ToString());
             Assert.AreEqual(0, readDT.Rows[0]["列2"]);
@@ -267,7 +267,7 @@ namespace FireflySoft.Excel.UnitTest
             oper.WriteCell(row, 1, dt.Rows[1]["姓名"], CellDataType.Text);
             oper.WriteCell(row, 2, dt.Rows[1]["性别"], CellDataType.Int);
 
-            var readDT = oper.ReadSheet(sheet, false, 0, true);
+            var readDT = oper.ReadSheet(sheet, false, true, 0);
             Assert.AreEqual(1, readDT.Rows.Count);
             Assert.AreEqual("李四", readDT.Rows[0]["列1"].ToString());
             Assert.AreEqual(0, readDT.Rows[0]["列2"]);
@@ -291,7 +291,7 @@ namespace FireflySoft.Excel.UnitTest
             var cell2 = row.CreateCell(1);
             oper.WriteCell(cell2, dt.Rows[1]["性别"], CellDataType.Int);
 
-            var readDT = oper.ReadSheet(sheet, false, 0, true);
+            var readDT = oper.ReadSheet(sheet, false, true, 0);
             Assert.AreEqual(1, readDT.Rows.Count);
             Assert.AreEqual("李四", readDT.Rows[0]["列1"].ToString());
             Assert.AreEqual(0, readDT.Rows[0]["列2"]);
@@ -375,7 +375,7 @@ namespace FireflySoft.Excel.UnitTest
             string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
             NPOIOperator oper = new NPOIOperator(dataFilePath, true);
             var sheet = oper.GetSheet("Sheet1");
-            var readDT = oper.ReadSheet(sheet, true, 0, true);
+            var readDT = oper.ReadSheet(sheet, true, true, 0);
             Assert.AreEqual(6, readDT.Rows.Count);
             Assert.AreEqual("猴六", readDT.Rows[3]["姓名"].ToString());
             Assert.AreEqual(new DateTime(1988, 3, 14), readDT.Rows[3]["出生日期"]);
@@ -407,7 +407,21 @@ namespace FireflySoft.Excel.UnitTest
         }
 
         [TestMethod]
-        public void TestReadContent()
+        public void TestReadContentOnlyStartRowNumber()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            var dataTable = GetTestDataSchema();
+            var readCount = oper.ReadContent(sheet, 1, dataTable);
+
+            Assert.AreEqual(6, readCount);
+            Assert.AreEqual("猴六", dataTable.Rows[3]["姓名"].ToString());
+            Assert.AreEqual(new DateTime(1988, 3, 14), dataTable.Rows[3]["出生日期"]);
+        }
+
+        [TestMethod]
+        public void TestReadContentWithEndRowNumber()
         {
             string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
             NPOIOperator oper = new NPOIOperator(dataFilePath, true);
@@ -421,18 +435,207 @@ namespace FireflySoft.Excel.UnitTest
         }
 
         [TestMethod]
-        public void TestReadSheetAndUseCellType()
+        public void TestReadContentOnlyStartRowNumberAndUseCellType()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+
+            var dataTable = new DataTable();
+            dataTable.Columns.Add("列1");
+            dataTable.Columns.Add("列2");
+            dataTable.Columns.Add("列3");
+            dataTable.Columns.Add("列4");
+            dataTable.Columns.Add("列5");
+
+            var readCount = oper.ReadContent(sheet, 1, dataTable, true);
+
+            Assert.AreEqual(6, readCount);
+            Assert.AreEqual("猴六", dataTable.Rows[3]["列2"].ToString());
+            Assert.AreEqual(new DateTime(1988, 3, 14), dataTable.Rows[3]["列5"]);
+        }
+
+        [TestMethod]
+        public void TestReadContentWithEndRowNumberAndUseCellType()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+
+            var dataTable = new DataTable();
+            dataTable.Columns.Add("列1");
+            dataTable.Columns.Add("列2");
+            dataTable.Columns.Add("列3");
+            dataTable.Columns.Add("列4");
+            dataTable.Columns.Add("列5");
+
+            var readCount = oper.ReadContent(sheet, 1, 6, dataTable, true);
+
+            Assert.AreEqual(6, readCount);
+            Assert.AreEqual("猴六", dataTable.Rows[3]["列2"].ToString());
+            Assert.AreEqual(new DateTime(1988, 3, 14), dataTable.Rows[3]["列5"]);
+        }
+
+        [TestMethod]
+        public void TestReadRow()
         {
             var dt = GetTestData();
 
-            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "data.xlsx");
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
             NPOIOperator oper = new NPOIOperator(dataFilePath, true);
 
             var sheet = oper.GetSheet(0);
-            var readDT = oper.ReadSheet(sheet, true, 0, true);
+            var row = sheet.GetRow(2);
+            var rowData = oper.ReadRow(row, dt.Columns);
 
-            Assert.AreEqual(2, readDT.Rows.Count);
-            Assert.AreEqual(1, readDT.Rows[0][1]);
+            Assert.AreEqual(5, rowData.Length);
+            Assert.AreEqual("李四", rowData[1]);
+            Assert.AreEqual(new DateTime(1984, 5, 26), rowData[4]);
+        }
+
+        [TestMethod]
+        public void TestReadRowWithUseCellType()
+        {
+            var dataTable = new DataTable();
+            dataTable.Columns.Add("列1");
+            dataTable.Columns.Add("列2");
+            dataTable.Columns.Add("列3");
+            dataTable.Columns.Add("列4");
+            dataTable.Columns.Add("列5");
+
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet(0);
+            var row = sheet.GetRow(2);
+            var rowData = oper.ReadRow(row, dataTable.Columns, true);
+
+            Assert.AreEqual(5, rowData.Length);
+            Assert.AreEqual("李四", rowData[1]);
+            Assert.AreEqual(new DateTime(1984, 5, 26), rowData[4]);
+        }
+
+        [TestMethod]
+        public void TestReadCellWithSheet()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet(0);
+            var cellValue = oper.ReadCell(sheet, 2, 1, CellDataType.Text);
+
+            Assert.AreEqual("李四", cellValue);
+        }
+
+        [TestMethod]
+        public void TestReadCellWithRow()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet(0);
+            var row = sheet.GetRow(2);
+            var cellValue = oper.ReadCell(row, 1, CellDataType.Text);
+
+            Assert.AreEqual("李四", cellValue);
+        }
+
+        [TestMethod]
+        public void TestReadCell()
+        {
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "forread.xlsx");
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+
+            var sheet = oper.GetSheet(0);
+            var row = sheet.GetRow(2);
+            var cell = row.GetCell(1);
+            var cellValue = oper.ReadCell(cell, CellDataType.Text);
+
+            Assert.AreEqual("李四", cellValue);
+        }
+
+        [TestMethod]
+        public void TestFlushWithXlsx()
+        {
+            var dt = GetTestData();
+
+            var fileName = "write" + Guid.NewGuid().ToString() + ".xlsx";
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", fileName);
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            oper.WriteSheet("Sheet3", dt, true);
+            oper.Flush();
+
+            try
+            {
+                NPOIOperator oper2 = new NPOIOperator(dataFilePath, true);
+                var sheet = oper2.GetSheet("Sheet3");
+                var dt2 = oper2.ReadSheet(sheet, true, true, 0);
+
+                Assert.AreEqual(3, dt2.Rows.Count);
+                Assert.AreEqual("李四", dt2.Rows[1]["姓名"]);
+                Assert.AreEqual(new DateTime(2000, 8, 8), dt2.Rows[1]["出生日期"]);
+            }
+            finally
+            {
+                File.Delete(dataFilePath);
+            }
+        }
+
+        [TestMethod]
+        public void TestFlushWithXls()
+        {
+            var dt = GetTestData();
+
+            var fileName = "write" + Guid.NewGuid().ToString() + ".xls";
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", fileName);
+            NPOIOperator oper = new NPOIOperator(dataFilePath, true);
+            oper.WriteSheet("Sheet3", dt, true);
+            oper.Flush();
+
+            try
+            {
+                NPOIOperator oper2 = new NPOIOperator(dataFilePath, true);
+                var sheet = oper2.GetSheet("Sheet3");
+                var dt2 = oper2.ReadSheet(sheet, true, true, 0);
+
+                Assert.AreEqual(3, dt2.Rows.Count);
+                Assert.AreEqual("李四", dt2.Rows[1]["姓名"]);
+                Assert.AreEqual(new DateTime(2000, 8, 8), dt2.Rows[1]["出生日期"]);
+            }
+            finally
+            {
+                File.Delete(dataFilePath);
+            }
+        }
+
+        [TestMethod]
+        public void TestFlushWithTemplate()
+        {
+            var dt = GetTestData();
+
+            string templateFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", "template.xlsx");
+
+            var fileName = "template" + Guid.NewGuid().ToString() + ".xlsx";
+            string dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "file", fileName);
+            NPOIOperator oper = new NPOIOperator(templateFilePath, dataFilePath, true);
+            var sheet = oper.GetSheet("Sheet1");
+            oper.WriteContent(sheet, dt, 3, 1);
+            oper.Flush();
+
+            try
+            {
+                NPOIOperator oper2 = new NPOIOperator(dataFilePath, true);
+                var sheet2 = oper2.GetSheet("Sheet1");
+                var dt2 = oper2.ReadSheet(sheet, true, true, 2, 1);
+
+                Assert.AreEqual(3, dt2.Rows.Count);
+                Assert.AreEqual("李四", dt2.Rows[1]["姓名"]);
+                Assert.AreEqual(new DateTime(2000, 8, 8), dt2.Rows[1]["出生日期"]);
+            }
+            finally
+            {
+                File.Delete(dataFilePath);
+            }
         }
 
         private DataTable GetTestData()

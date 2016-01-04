@@ -218,7 +218,7 @@ namespace FireflySoft.Excel
             ISheet sheet = GetSheet(sheetName);
             if (sheet == null)
             {
-                CreateSheet(sheetName);
+                sheet = CreateSheet(sheetName);
             }
 
             return WriteSheet(sheet, data, isWriteTitle);
@@ -301,13 +301,26 @@ namespace FireflySoft.Excel
         /// <returns></returns>
         public int WriteContent(ISheet sheet, DataTable data, int strartRowNumber)
         {
+            return WriteContent(sheet, data, strartRowNumber, 0);
+        }
+
+        /// <summary>
+        /// 写入数据到内容
+        /// </summary>
+        /// <param name="sheet"></param>
+        /// <param name="data"></param>
+        /// <param name="strartRowNumber"></param>
+        /// <param name="startColNumber"></param>
+        /// <returns></returns>
+        public int WriteContent(ISheet sheet, DataTable data, int strartRowNumber, int startColNumber)
+        {
             // 创建内容行
             for (int i = 0; i < data.Rows.Count; i++)
             {
                 IRow row = sheet.CreateRow(strartRowNumber);
                 row.Height = 26 * 20;
 
-                WriteRow(row, data.Columns, data.Rows[i]);
+                WriteRow(row, startColNumber, data.Columns, data.Rows[i]);
 
                 strartRowNumber++;
             }
@@ -323,9 +336,21 @@ namespace FireflySoft.Excel
         /// <param name="cols"></param>
         public void WriteRow(IRow row, DataColumnCollection cols, DataRow data)
         {
+            WriteRow(row, 0, cols, data);
+        }
+
+        /// <summary>
+        /// 写入数据到某一行
+        /// </summary>
+        /// <param name="row"></param>
+        /// <param name="startColNumber"></param>
+        /// <param name="data"></param>
+        /// <param name="cols"></param>
+        public void WriteRow(IRow row, int startColNumber, DataColumnCollection cols, DataRow data)
+        {
             for (int j = 0; j < cols.Count; j++)
             {
-                var cell = row.CreateCell(j);
+                var cell = row.CreateCell(startColNumber + j);
 
                 CellDataType cellDataType = CellDataType.None;
                 if (data[j] != null)
@@ -539,7 +564,7 @@ namespace FireflySoft.Excel
         /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
         public DataTable ReadSheet(ISheet sheet, bool isReadTitle, int startRowNumber)
         {
-            return ReadSheet(sheet, isReadTitle, startRowNumber, false);
+            return ReadSheet(sheet, isReadTitle, false, startRowNumber);
         }
 
         /// <summary>
@@ -547,11 +572,14 @@ namespace FireflySoft.Excel
         /// </summary>
         /// <param name="sheet">Sheet表</param>
         /// <param name="isReadTitle">是否将Sheet表标题作为DataTable列名</param>
-        /// <param name="startRowNumber">起始行号</param>
         /// <param name="useCellType">是否使用单元格的数据类型格式化数据，如果列中的数据类型都是一致的可以设置为true，否则使用DataTable中列的数据类型读取数据。</param>
+        /// <param name="startRowNumber">起始行号</param>
+        /// <param name="startColNumber">起始列号</param>
         /// <returns>读取到的数据，如果Sheet表不存在则返回null</returns>
-        public DataTable ReadSheet(ISheet sheet, bool isReadTitle, int startRowNumber, bool useCellType)
+        public DataTable ReadSheet(ISheet sheet, bool isReadTitle, bool useCellType, int startRowNumber, int? startColNumber = null)
         {
+            // TODO:添加读取结束行号和结束列号参数
+
             DataTable data = null;
 
             if (sheet != null)
@@ -562,7 +590,7 @@ namespace FireflySoft.Excel
                 if (isReadTitle)
                 {
                     IRow titleRow = sheet.GetRow(startRowNumber);
-                    var cols = ReadTitle(titleRow);
+                    var cols = ReadTitle(titleRow, startColNumber);
                     if (cols != null)
                     {
                         data.Columns.AddRange(cols);
@@ -576,7 +604,12 @@ namespace FireflySoft.Excel
                     var row = sheet.GetRow(startRowNumber);
                     if (row != null)
                     {
-                        var colCount = row.Cells.Count;
+                        if (!startColNumber.HasValue)
+                        {
+                            startColNumber = row.FirstCellNum;
+                        }
+
+                        var colCount = row.LastCellNum - startColNumber.Value;
                         for (int i = 0; i < colCount; i++)
                         {
                             data.Columns.Add("列" + (i + 1));
@@ -612,14 +645,20 @@ namespace FireflySoft.Excel
         /// 从Row实例获取标题
         /// </summary>
         /// <param name="row">Row实例</param>
+        /// <param name="startColNumber">起始列号</param>
         /// <returns>标题列数组</returns>
-        public DataColumn[] ReadTitle(IRow row)
+        public DataColumn[] ReadTitle(IRow row, int? startColNumber = null)
         {
-            int cellCount = row.LastCellNum;
+            if (!startColNumber.HasValue)
+            {
+                startColNumber = row.FirstCellNum;
+            }
+
+            int cellCount = row.LastCellNum - startColNumber.Value;
             DataColumn[] cols = new DataColumn[cellCount];
 
             int j = 0;
-            for (int i = row.FirstCellNum; i < cellCount; i++)
+            for (int i = startColNumber.Value; i < row.LastCellNum; i++)
             {
                 DataColumn column = new DataColumn(row.GetCell(i).StringCellValue);
                 cols[j] = column;
