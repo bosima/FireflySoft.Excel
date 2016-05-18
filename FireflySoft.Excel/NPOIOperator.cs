@@ -511,6 +511,11 @@ namespace FireflySoft.Excel
                     }
                 }
 
+                if (columnWidth > 255)
+                {
+                    columnWidth = 255;
+                }
+
                 sheet.SetColumnWidth(columnNum, columnWidth * 256);
             }
         }
